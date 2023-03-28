@@ -19,6 +19,8 @@ import (
 	"github.com/openfaas/faas/gateway/types"
 	"github.com/openfaas/faas/gateway/version"
 	natsHandler "github.com/openfaas/nats-queue-worker/handler"
+
+	"net/http/pprof"
 )
 
 // NameExpression for a function / service
@@ -77,12 +79,12 @@ func main() {
 
 	loggingNotifier := handlers.LoggingNotifier{}
 
-	prometheusNotifier := handlers.PrometheusFunctionNotifier{
+	/*prometheusNotifier := handlers.PrometheusFunctionNotifier{
 		Metrics:           &metricsOptions,
 		FunctionNamespace: config.Namespace,
-	}
+	}*/
 
-	functionNotifiers := []handlers.HTTPNotifier{loggingNotifier, prometheusNotifier}
+	functionNotifiers := []handlers.HTTPNotifier{loggingNotifier /*prometheusNotifier*/}
 	forwardingNotifiers := []handlers.HTTPNotifier{loggingNotifier}
 	quietNotifier := []handlers.HTTPNotifier{}
 
@@ -222,6 +224,14 @@ func main() {
 		r.HandleFunc("/async-function/{name:["+NameExpression+"]+}", faasHandlers.QueuedProxy).Methods(http.MethodPost)
 		r.HandleFunc("/async-function/{name:["+NameExpression+"]+}/{params:.*}", faasHandlers.QueuedProxy).Methods(http.MethodPost)
 	}
+
+	// Add pprof endpoints
+	r.HandleFunc("/debug/pprof/", pprof.Index)
+	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	fs := http.FileServer(http.Dir("./assets/"))
 

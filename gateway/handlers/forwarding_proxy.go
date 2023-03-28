@@ -87,6 +87,7 @@ func forwardRequest(w http.ResponseWriter,
 	timeout time.Duration,
 	writeRequestURI bool,
 	serviceAuthInjector middleware.AuthInjector) (int, error) {
+	proxy_start := time.Now()
 
 	upstreamReq := buildUpstreamRequest(r, baseURL, requestURL)
 	if upstreamReq.Body != nil {
@@ -116,7 +117,11 @@ func forwardRequest(w http.ResponseWriter,
 	}
 
 	copyHeaders(w.Header(), &res.Header)
+	proxy_end := time.Now()
 
+	// Add  start and end to the header with the gateway prefix
+	w.Header().Add("X-Gateway-Start", proxy_start.Format(time.RFC3339Nano))
+	w.Header().Add("X-Gateway-End", proxy_end.Format(time.RFC3339Nano))
 	// Write status code
 	w.WriteHeader(res.StatusCode)
 

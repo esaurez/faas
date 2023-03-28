@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/openfaas/faas/gateway/pkg/middleware"
 	"github.com/openfaas/faas/gateway/scaling"
@@ -20,6 +21,7 @@ import (
 func MakeScalingHandler(next http.HandlerFunc, scaler scaling.FunctionScaler, config scaling.ScalingConfig, defaultNamespace string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		start_time := time.Now()
 
 		functionName, namespace := middleware.GetNamespace(defaultNamespace, middleware.GetServiceName(r.URL.String()))
 
@@ -42,6 +44,10 @@ func MakeScalingHandler(next http.HandlerFunc, scaler scaling.FunctionScaler, co
 			w.Write([]byte(errStr))
 			return
 		}
+
+		scale_end_time := time.Now()
+
+		log.Printf("[Scale] for function [%s] took %s\n", functionName, scale_end_time.Sub(start_time))
 
 		if res.Available {
 			next.ServeHTTP(w, r)
