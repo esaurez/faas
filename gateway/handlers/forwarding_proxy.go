@@ -4,15 +4,20 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/openfaas/faas/gateway/pkg/middleware"
+	"github.com/openfaas/faas/gateway/requests"
+	"github.com/openfaas/faas/gateway/scaling"
 	"github.com/openfaas/faas/gateway/types"
 )
 
@@ -21,7 +26,8 @@ func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 	notifiers []HTTPNotifier,
 	baseURLResolver middleware.BaseURLResolver,
 	urlPathTransformer middleware.URLPathTransformer,
-	serviceAuthInjector middleware.AuthInjector) http.HandlerFunc {
+	serviceAuthInjector middleware.AuthInjector,
+	funcCache scaling.FunctionCacher) http.HandlerFunc {
 
 	writeRequestURI := false
 	if _, exists := os.LookupEnv("write_request_uri"); exists {
@@ -35,6 +41,21 @@ func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 
 		for _, notifier := range notifiers {
 			notifier.Notify(r.Method, requestURL, originalURL, http.StatusProcessing, "started", time.Second*0)
+		}
+
+		// If request is a DELETE for the path /system/functions, delete the function from the  funcCache
+		if funcCache != nil && r.Method == http.MethodDelete && requestURL == "/system/functions" {
+			// Get the DeleteFunctionRequest from the request body
+			defer r.Body.Close()
+			body, _ := ioutil.ReadAll(r.Body)
+			req := requests.DeleteFunctionRequest{}
+			err := json.Unmarshal(body, &req)
+			// Delete the function from the funcCache using the default namespace
+			if err == nil {
+				funcCache.Delete(req.FunctionName, "openfaas-fn")
+			}
+			// Create a copy of the request body and add it to the request
+			r.Body = ioutil.NopCloser(bytes.NewReader(body))
 		}
 
 		start := time.Now()

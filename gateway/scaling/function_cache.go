@@ -12,6 +12,7 @@ import (
 type FunctionCacher interface {
 	Set(functionName, namespace string, serviceQueryResponse ServiceQueryResponse)
 	Get(functionName, namespace string) (ServiceQueryResponse, bool)
+	Delete(functionName, namespace string) error
 }
 
 // FunctionCache provides a cache of Function replica counts
@@ -58,4 +59,13 @@ func (fc *FunctionCache) Get(functionName, namespace string) (ServiceQueryRespon
 	}
 
 	return queryRes, hit
+}
+
+func (fc *FunctionCache) Delete(functionName, namespace string) error {
+	fc.Sync.Lock()
+	defer fc.Sync.Unlock()
+
+	delete(fc.Cache, functionName+"."+namespace)
+
+	return nil
 }

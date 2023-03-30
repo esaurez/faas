@@ -75,8 +75,12 @@ func (f *FunctionScaler) Scale(functionName, namespace string) FunctionScaleResu
 		}
 	}
 
+	// Store the result of GetReplicas in the cache
+	queryResponse := res.(ServiceQueryResponse)
+	f.Cache.Set(functionName, namespace, queryResponse)
+
 	// Check if there are available replicas in the live data
-	if res.(ServiceQueryResponse).AvailableReplicas > 0 {
+	if queryResponse.AvailableReplicas > 0 {
 		return FunctionScaleResult{
 			Error:     nil,
 			Available: true,
@@ -84,10 +88,6 @@ func (f *FunctionScaler) Scale(functionName, namespace string) FunctionScaleResu
 			Duration:  time.Since(start),
 		}
 	}
-
-	// Store the result of GetReplicas in the cache
-	queryResponse := res.(ServiceQueryResponse)
-	f.Cache.Set(functionName, namespace, queryResponse)
 
 	// If the desired replica count is 0, then a scale up event
 	// is required.
