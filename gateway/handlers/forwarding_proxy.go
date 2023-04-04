@@ -13,8 +13,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	provider_types "github.com/openfaas/faas-provider/types"
 	"github.com/openfaas/faas/gateway/pkg/middleware"
 	"github.com/openfaas/faas/gateway/requests"
 	"github.com/openfaas/faas/gateway/scaling"
@@ -44,18 +46,33 @@ func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 		}
 
 		// If request is a DELETE for the path /system/functions, delete the function from the  funcCache
-		if funcCache != nil && r.Method == http.MethodDelete && requestURL == "/system/functions" {
-			// Get the DeleteFunctionRequest from the request body
-			defer r.Body.Close()
-			body, _ := ioutil.ReadAll(r.Body)
-			req := requests.DeleteFunctionRequest{}
-			err := json.Unmarshal(body, &req)
-			// Delete the function from the funcCache using the default namespace
-			if err == nil {
-				funcCache.Delete(req.FunctionName, "openfaas-fn")
+		// or it is a scale to zero request, delete the function from the funcCache
+		if funcCache != nil {
+			if r.Method == http.MethodDelete && strings.HasPrefix(requestURL, "/system/functions") {
+				// Get the DeleteFunctionRequest from the request body
+				defer r.Body.Close()
+				body, _ := ioutil.ReadAll(r.Body)
+				req := requests.DeleteFunctionRequest{}
+				err := json.Unmarshal(body, &req)
+				// Delete the function from the funcCache using the default namespace
+				if err == nil {
+					funcCache.Delete(req.FunctionName, "openfaas-fn")
+				}
+				// Create a copy of the request body and add it to the request
+				r.Body = ioutil.NopCloser(bytes.NewReader(body))
+			} else if r.Method == http.MethodPost && strings.HasPrefix(requestURL, "/system/scale-function/") {
+				defer r.Body.Close()
+				body, _ := ioutil.ReadAll(r.Body)
+				req := provider_types.ScaleServiceRequest{}
+				err := json.Unmarshal(body, &req)
+				// Delete the function from the funcCache using the default namespace
+				if err == nil && req.Replicas == 0 {
+					funcCache.Delete(req.ServiceName, "openfaas-fn")
+				}
+				// Create a copy of the request body and add it to the request
+				r.Body = ioutil.NopCloser(bytes.NewReader(body))
+
 			}
-			// Create a copy of the request body and add it to the request
-			r.Body = ioutil.NopCloser(bytes.NewReader(body))
 		}
 
 		start := time.Now()
