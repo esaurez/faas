@@ -66,7 +66,9 @@ func MakeForwardingProxyHandler(proxy *types.HTTPClientReverseProxy,
 				req := provider_types.ScaleServiceRequest{}
 				err := json.Unmarshal(body, &req)
 				// Delete the function from the funcCache using the default namespace
+				log.Println("Receieved a scale function request")
 				if err == nil && req.Replicas == 0 {
+					log.Println("Deleting from Cache")
 					funcCache.Delete(req.ServiceName, "openfaas-fn")
 				}
 				// Create a copy of the request body and add it to the request
